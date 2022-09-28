@@ -1,0 +1,226 @@
+---
+title: "RLadies demo"
+author: "[Chloe Yap](https://github.com/cyap7)"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  epuRate::PCTG:
+    toc: true
+    number_sections: true
+    code_folding: hide
+knit: (function(inputFile, encoding) { 
+          rmarkdown::render(inputFile,
+                        encoding=encoding, 
+                        output_file='mtcars1') })
+---
+
+# Set-up
+
+## Libraries
+
+```{r}
+
+library(data.table)
+library(DT)
+
+library(tidyverse)
+library(broom)
+library(ggstatsplot)
+library(ggrepel)
+library(wesanderson)
+
+```
+
+## Directories
+
+- use of filen variable to generalisable
+- use of organised directories
+
+```{r}
+
+filen <- "mtcars1"
+
+root_dir <- "~/Documents/GitHub/RLadies"
+scripts_dir <- paste(root_dir, "/scripts", sep = "")
+data_dir <- paste(root_dir, "/data", sep = "")
+out_dir <- paste(root_dir, "/output", sep = "")
+
+```
+
+## Read-in data
+
+- this is just the usual mtcars dataset being read in here
+- prefer to use fread
+
+```{r}
+
+mtcars_dir <- paste(data_dir, "/", filen, ".txt", sep = "")
+mtcars <- fread(mtcars_dir)
+mtcars <- as.data.frame(mtcars)
+datatable(mtcars)
+
+```
+
+## Run common QC across analyses
+
+- the `local = knitr::knit_global()` part is important, as I discovered last night ...
+
+```{r}
+
+str(mtcars)
+source(paste(scripts_dir, "/common_qc.R", sep = ""), local = knitr::knit_global())
+
+```
+
+## Look at data
+
+- I like DT::datatable() as you can interactively look through data tables 
+
+```{r}
+
+datatable(mtcars)
+
+```
+
+## Some sneaky bash
+
+- 2 alternatives here
+
+```{r}
+
+system(paste("grep Merc ", mtcars_dir, sep = ""), intern = T)
+
+```
+
+```{sh}
+
+grep Merc ~/Documents/GitHub/RLadies/data/mtcars1.txt
+
+```
+
+# Analysis
+
+## Summarise data
+
+- use of group_by() %>% dplyr::summarise()
+
+```{r}
+
+mtcars %>% group_by(Brand) %>% dplyr::summarise(
+  n = n(),
+  mpg_mean = mean(mpg),
+  mpg_sd = sd(mpg),
+)
+
+```
+
+## Use of pivot_wider() (used to be spread())
+
+- eg. for each group (eg. Brand) want to get summary statistics of variable X (eg. mean mpg) split by another variable Y (eg. gear)
+- **N.B. the mtcars dataset isn't exactly optimal for this**
+
+```{r}
+
+mtcars %>% group_by(Brand, gear) %>% 
+  dplyr::summarise(mean_mpg = mean(mpg)) %>% 
+  pivot_wider(., names_from = gear, values_from = mean_mpg) %>%
+  datatable()
+
+```
+
+# Linear models with tabulated format
+
+```{r}
+
+tidy_df <- parameters::model_parameters(model = lm(mpg ~ gear + cyl, data = mtcars), ci = 0.95, verbose = FALSE) %>% 
+  parameters::standardize_names(style = "broom")
+
+tidy_coef <- mtcars %>% mutate(group = c(rep(1, 16), rep(2, 16))) %>% 
+  group_by(group) %>% 
+  do(model = tidy(lm(mpg ~ gear + cyl, data = .))) %>% unnest(model)
+
+```
+
+# Plots
+
+## Boxplot 
+
+### ggplot()
+
+```{r}
+
+mtcars %>% mutate(gear = as.factor(gear)) %>%
+  ggplot(aes(x = gear, y = mpg, fill = gear)) +
+  geom_violin(alpha = 0.8) +
+  geom_point(colour = "gray50", alpha = 0.8) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  scale_fill_manual(values = wes_palette(name = "Zissou1", 4, type = "discrete")[c(1,3,4)], name = "")
+
+ggsave(paste(out_dir, "/", filen, "_ggplot.png", sep = ""))
+
+```
+
+### ggrepel()
+
+```{r}
+
+mtcars %>% mutate(label = ifelse(mpg > 25, Make, "")) %>%
+  mutate(gear = as.factor(gear)) %>%
+  ggplot(aes(x = gear, y = mpg, fill = gear)) +
+  geom_violin(alpha = 0.8) +
+  geom_point(colour = "gray50", alpha = 0.8) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  scale_fill_manual(values = wes_palette(name = "Zissou1", 4, type = "discrete")[c(1,3,4)], name = "") +
+  geom_label_repel(aes(x = gear, y = mpg, label = ifelse(label != "", label, "")), force = 20, size = 4, min.segment.length = 0)
+
+ggsave(paste(out_dir, "/", filen, "_ggplot_ggrepel.png", sep = ""))
+
+```
+
+### ggstatsplot()
+
+- https://indrajeetpatil.github.io/ggstatsplot/
+
+```{r}
+
+mtcars %>% mutate(label = ifelse(mpg > 25, Make, "")) %>%
+  mutate(gear = as.factor(gear)) %>%
+  ggbetweenstats(
+    x     = gear,
+    y     = mpg,
+    title = "Distribution of mpg across gears"
+  )
+
+ggsave(paste(out_dir, "/", filen, "_ggstatsplot.png", sep = ""))
+
+```
+
+## Linear model plot
+
+### ggstatsplot()
+
+```{r}
+
+lm1 <- lm(mpg ~ gear + cyl, data = mtcars)
+ggcoefstats(lm1)
+
+```
+
+## Scatterplot
+
+```{r}
+
+ggscatterstats(
+  data  = mtcars,
+  x     = mpg,
+  y     = hp,
+  xlab  = "mpg",
+  ylab  = "hp",
+  title = "mtcars: hp vs mph"
+)
+
+```
+
+
+## Now go over to Inkscape to manipulate
