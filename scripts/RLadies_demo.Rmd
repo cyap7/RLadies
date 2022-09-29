@@ -54,9 +54,9 @@ out_dir <- paste(root_dir, "/output", sep = "")
 ```{r}
 
 mtcars_dir <- paste(data_dir, "/", filen, ".txt", sep = "")
-mtcars <- fread(mtcars_dir)
+mtcars <- data.table::fread(mtcars_dir)
 mtcars <- as.data.frame(mtcars)
-datatable(mtcars)
+DT::datatable(mtcars)
 
 ```
 
@@ -127,7 +127,7 @@ mtcars %>% group_by(Brand, gear) %>%
 
 ```
 
-# Linear models with tabulated format
+## Linear models with tabulated format
 
 ```{r}
 
@@ -175,6 +175,7 @@ mtcars %>% mutate(label = ifelse(mpg > 25, Make, "")) %>%
   geom_label_repel(aes(x = gear, y = mpg, label = ifelse(label != "", label, "")), force = 20, size = 4, min.segment.length = 0)
 
 ggsave(paste(out_dir, "/", filen, "_ggplot_ggrepel.png", sep = ""))
+ggsave(paste(out_dir, "/", filen, "_ggplot_ggrepel.svg", sep = ""))
 
 ```
 
@@ -193,6 +194,7 @@ mtcars %>% mutate(label = ifelse(mpg > 25, Make, "")) %>%
   )
 
 ggsave(paste(out_dir, "/", filen, "_ggstatsplot.png", sep = ""))
+ggsave(paste(out_dir, "/", filen, "_ggstatsplot.svg", sep = ""))
 
 ```
 
